@@ -56,6 +56,7 @@
   .sheet-tracker{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
   .sheet-chip{display:inline-flex;align-items:center;gap:6px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;padding:5px 12px;border-radius:20px;border:1px solid var(--border);color:var(--text-dim);background:var(--dark4);}
   .sheet-chip.confirmed{border-color:var(--green);color:var(--green);background:rgba(76,175,125,0.12);}
+  .sheet-chip .del-sheet{background:none;border:none;color:var(--red);cursor:pointer;font-size:13px;padding:0 0 0 4px;line-height:1;}
   .preview-img{max-width:100%;max-height:300px;border-radius:4px;border:1px solid var(--border);display:block;margin-bottom:12px;}
   .loading-wrap{padding:16px 0 8px;}
   .loading-bar{height:3px;background:var(--dark5);border-radius:2px;overflow:hidden;margin-bottom:10px;}
@@ -287,7 +288,23 @@ function onFileSelected(e){const f=e.target.files&&e.target.files[0];if(!f)retur
 function processFile(file){photoMimeType=file.type&&file.type.startsWith('image/')?file.type:'image/jpeg';const r=new FileReader();r.onload=ev=>{const d=ev.target.result;const b=d.split(',')[1];if(!b){alert('Could not read the photo. Please try again.');return;}photoBase64=b;document.getElementById('photo-preview').src=d;goToStep('preview');};r.onerror=()=>alert('Error reading photo. Please try again.');r.readAsDataURL(file);}
 function switchPractice(val){currentPrac=parseInt(val);if(!allData[currentPrac])allData[currentPrac]=[];if(!sheetsInfo[currentPrac])sheetsInfo[currentPrac]=[];['tracker-prac','review-prac-label','results-prac-label','standings-prac-label','missed-prac-label'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=currentPrac;});resetUpload();refreshTracker();refreshBadge();}
 function showTab(name,btn){document.querySelectorAll('.main').forEach(el=>el.classList.add('hidden'));document.querySelectorAll('.nav-tab').forEach(el=>el.classList.remove('active'));document.getElementById('tab-'+name).classList.remove('hidden');if(btn)btn.classList.add('active');if(name==='review')refreshReviewTab();if(name==='results')refreshResults();if(name==='standings')refreshStandings();if(name==='missed')refreshMissed();if(name==='export')refreshExportSummary();}
-function refreshTracker(){const info=sheetsInfo[currentPrac]||[];const el=document.getElementById('sheet-tracker');const summary=document.getElementById('tracker-summary');if(info.length===0){el.innerHTML='<span style="font-size:13px;color:var(--text-dim);">No sheets uploaded yet.</span>';summary.classList.add('hidden');}else{el.innerHTML=info.map((s,i)=>`<span class="sheet-chip confirmed">✓ Sheet ${i+1} <span style="opacity:.7">(${s.count} reps)</span></span>`).join('');const total=info.reduce((a,b)=>a+b.count,0);summary.textContent=`${info.length} sheet${info.length!==1?'s':''} confirmed — ${total} total reps`;summary.classList.remove('hidden');}document.getElementById('sheet-num-label').textContent=`— Sheet ${(sheetsInfo[currentPrac]||[]).length+1}`;const idx=(sheetsInfo[currentPrac]||[]).length+1;document.getElementById('preview-sheet-label').textContent=`— Sheet ${idx}`;document.getElementById('review-sheet-label').textContent=`— Sheet ${idx}`;}
+
+// ── DELETE SHEET ── NEW FEATURE
+function deleteSheet(sheetLabel){
+  if(!confirm(`Delete all entries from "${sheetLabel}"? This cannot be undone.`))return;
+  allData[currentPrac]=(allData[currentPrac]||[]).filter(e=>e.sheet!==sheetLabel);
+  sheetsInfo[currentPrac]=(sheetsInfo[currentPrac]||[]).filter(s=>s.label!==sheetLabel);
+  // Rename remaining sheets so numbering stays clean
+  sheetsInfo[currentPrac].forEach((s,i)=>{
+    const oldLabel=s.label;
+    const newLabel=`Sheet ${i+1}`;
+    s.label=newLabel;
+    allData[currentPrac].forEach(e=>{if(e.sheet===oldLabel)e.sheet=newLabel;});
+  });
+  refreshTracker();refreshBadge();
+}
+
+function refreshTracker(){const info=sheetsInfo[currentPrac]||[];const el=document.getElementById('sheet-tracker');const summary=document.getElementById('tracker-summary');if(info.length===0){el.innerHTML='<span style="font-size:13px;color:var(--text-dim);">No sheets uploaded yet.</span>';summary.classList.add('hidden');}else{el.innerHTML=info.map((s,i)=>`<span class="sheet-chip confirmed">✓ Sheet ${i+1} <span style="opacity:.7">(${s.count} reps)</span><button class="del-sheet" onclick="deleteSheet('${s.label}')" title="Delete this sheet">✕</button></span>`).join('');const total=info.reduce((a,b)=>a+b.count,0);summary.textContent=`${info.length} sheet${info.length!==1?'s':''} confirmed — ${total} total reps`;summary.classList.remove('hidden');}document.getElementById('sheet-num-label').textContent=`— Sheet ${(sheetsInfo[currentPrac]||[]).length+1}`;const idx=(sheetsInfo[currentPrac]||[]).length+1;document.getElementById('preview-sheet-label').textContent=`— Sheet ${idx}`;document.getElementById('review-sheet-label').textContent=`— Sheet ${idx}`;}
 function refreshBadge(){const count=(allData[currentPrac]||[]).length;const badge=document.getElementById('badge-review');if(count>0){badge.textContent=count;badge.classList.remove('hidden');}else badge.classList.add('hidden');}
 function goToStep(step){['upload','preview','review','next'].forEach(s=>document.getElementById('step-'+s).classList.toggle('hidden',s!==step));}
 function resetUpload(){photoBase64=null;photoMimeType='image/jpeg';pendingRows=[];const i=document.getElementById('photoInput');i.value='';i.removeAttribute('capture');document.getElementById('analyzeBtn').disabled=false;document.getElementById('loading-wrap').classList.add('hidden');goToStep('upload');refreshTracker();}
